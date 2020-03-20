@@ -1,0 +1,104 @@
+% Protocollo
+% 1. A -> S: A, B
+% 2. A -> B: A, exp(g, Na)
+% 3. S -> B: {A, B, Kab}_Kbs
+% 4. S -> A: {A, B, Kab}_Kas
+% 5. B -> A: B, exp(g, Nb)
+
+role role_A(A:agent,
+	    B:agent,
+	    S:agent,
+	    G:nat,
+	    Na:nat,
+	    Nb:nat,
+	    Kab: symmetric_key,
+	    Kas: symmetric_key,
+	    SND:channel(dy),
+	    RCV:channel(dy))
+played_by A
+def=
+	local
+		State:nat,
+		K:symmetric_key
+	init
+		State := 0
+	transition
+		1. State = 0
+		   /\ RCV(start)
+		   =|>
+		   State' := 1
+		   /\ K' := exp(exp(exp(G, Nb), Na), Kab)
+		   /\ secret(K', secretAB, {A, B})
+		   /\ SND({A.B.Kab}_Kas)
+		   /\ SND(A.exp(G, Na))
+		   /\ SND(Kas)
+
+end role
+
+role role_B(B:agent,
+	    A:agent,
+	    S:agent,
+	    G:nat,
+	    Na:nat,
+	    Nb:nat,
+	    Kab:symmetric_key,
+	    Kbs:symmetric_key,
+	    SND:channel(dy),
+	    RCV:channel(dy))
+played_by B
+def=
+	local
+		State:nat,
+		K:symmetric_key
+	init
+		State := 0
+	transition
+		1. State = 0
+		   /\ RCV(start)
+		   =|>                   
+                   State' := 1
+		   /\ K' := exp(exp(exp(G, Na), Nb), Kab)
+		   /\ secret(K', secretAB, {A, B})
+		   /\ SND({A.B.Kab}_Kbs)
+		   /\ SND(B.exp(G, Nb))
+		   /\ SND(Kbs)
+
+end role
+
+role session(A:agent, B:agent, S:agent, G:nat, Kas:symmetric_key, Kbs:symmetric_key)
+def=
+	local
+		SND1:channel(dy),
+		RCV1:channel(dy),		
+		SND2:channel(dy),
+		RCV2:channel(dy),
+		Na:nat,
+		Nb:nat,
+		Kab:symmetric_key
+	composition
+                role_A(A, B, S, G, Na, Nb, Kab, Kas, SND1, RCV1)
+		/\ role_B(B, A, S, G, Na, Nb, Kab, Kbs, SND2, RCV2)
+end role
+
+role environment()
+def=
+	const
+                a:agent,
+		b:agent,
+		s:agent,
+		g:nat,
+		kas:symmetric_key,
+		kbs:symmetric_key,
+		secretAB:protocol_id
+	intruder_knowledge = {a, b, g}
+	composition
+		session(a, b, s, g, kas, kbs)
+end role
+
+goal
+
+	secrecy_of secretAB
+
+end goal
+
+environment()
